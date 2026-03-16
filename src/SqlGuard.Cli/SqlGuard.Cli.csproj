@@ -16,6 +16,8 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+	<PackAsTool>true</PackAsTool>
+	<ToolCommandName>sqlguard</ToolCommandName>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
