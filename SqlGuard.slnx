@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SqlGuard.Cli/SqlGuard.Cli.csproj" />
+    <Project Path="src/SqlGuard.Core/SqlGuard.Core.csproj" />
+    <Project Path="src/SqlGuard.Providers.PostgreSQL/SqlGuard.Providers.PostgreSQL.csproj" />
+    <Project Path="src/SqlGuard.Providers.SqlServer/SqlGuard.Providers.SqlServer.csproj" />
+    <Project Path="src/SqlGuard.Reports/SqlGuard.Reports.csproj" />
+    <Project Path="src/SqlGuard.RulePacks.CIS/SqlGuard.RulePacks.CIS.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SqlGuard.Core.Tests/SqlGuard.Core.Tests.csproj" />
+    <Project Path="tests/SqlGuard.Integration.Tests/SqlGuard.Integration.Tests.csproj" />
+    <Project Path="tests/SqlGuard.Providers.PostgreSQL.Tests/SqlGuard.Providers.PostgreSQL.Tests.csproj" />
+    <Project Path="tests/SqlGuard.Providers.SqlServer.Tests/SqlGuard.Providers.SqlServer.Tests.csproj" />
+    <Project Path="tests/SqlGuard.Reports.Tests/SqlGuard.Reports.Tests.csproj" />
+  </Folder>
+</Solution>
