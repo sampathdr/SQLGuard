@@ -1,4 +1,14 @@
 <Solution>
+  <Folder Name="/samples/" />
+  <Folder Name="/samples/ci-cd/">
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/samples/config/">
+    <File Path="sqlguard.yml" />
+  </Folder>
+  <Folder Name="/samples/inventory/">
+    <File Path="servers.json" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/SqlGuard.Cli/SqlGuard.Cli.csproj" />
     <Project Path="src/SqlGuard.Core/SqlGuard.Core.csproj" />

@@ -1,0 +1,195 @@
+﻿# SqlGuard Rule Pack: postgresql-core / server-security
+
+rules:
+
+  - id: PG-CORE-001
+    title: PostgreSQL is running a supported, patched version
+    category: PatchManagement
+    severity: critical
+    mandatory: true
+    database: PostgreSQL
+    description: >
+      Running an EOL or unpatched PostgreSQL version exposes the instance
+      to known CVEs. PostgreSQL major versions are supported for 5 years.
+    query: |
+      SELECT current_setting('server_version') AS version
+    operator: custom
+    dynamic_expected_function: "SqlGuard.Providers.PostgreSQL.Functions.VersionSupportCheck"
+    remediation: >
+      Upgrade to the latest minor release for your major version.
+      See https://www.postgresql.org/support/versioning/
+    compliance_references:
+      - "CIS PostgreSQL 1.1"
+      - "NIST 800-53 SI-2"
+    tags: [patch, eol, version]
+
+  - id: PG-CORE-002
+    title: SSL is enforced (ssl = on)
+    category: Encryption
+    severity: high
+    mandatory: true
+    database: PostgreSQL
+    description: >
+      Without SSL, credentials and query results are transmitted in cleartext.
+      ssl = on must be set in postgresql.conf.
+    query: |
+      SELECT current_setting('ssl') AS ssl_enabled
+    operator: equals
+    expected: "on"
+    remediation: >
+      In postgresql.conf:
+        ssl = on
+      Obtain or generate a certificate:
+        ssl_cert_file = 'server.crt'
+        ssl_key_file  = 'server.key'
+      Reload: SELECT pg_reload_conf();
+    compliance_references:
+      - "CIS PostgreSQL 3.2"
+      - "NIST 800-53 SC-8"
+      - "PCI DSS 4.2.1"
+    tags: [encryption, ssl, tls, in-transit]
+
+  - id: PG-CORE-003
+    title: No 'trust' authentication in pg_hba.conf
+    category: Authentication
+    severity: critical
+    mandatory: true
+    database: PostgreSQL
+    description: >
+      The 'trust' auth method allows any OS user to connect as any PostgreSQL
+      role without a password. This must never appear in production pg_hba.conf.
+    query: |
+      SELECT COUNT(*) AS trust_entries
+      FROM pg_hba_file_rules
+      WHERE auth_method = 'trust'
+        AND address != '127.0.0.1/32'   -- local socket trust may be acceptable
+    operator: equals
+    expected: 0
+    remediation: >
+      Edit pg_hba.conf and replace all 'trust' entries with 'scram-sha-256'.
+      Then reload: SELECT pg_reload_conf();
+    compliance_references:
+      - "CIS PostgreSQL 3.1"
+      - "NIST 800-53 IA-2"
+    tags: [auth, pg-hba, trust, critical]
+
+  - id: PG-CORE-004
+    title: Password encryption uses scram-sha-256 (not md5)
+    category: Authentication
+    severity: high
+    mandatory: true
+    database: PostgreSQL
+    description: >
+      MD5 password hashing is cryptographically weak and vulnerable to
+      offline cracking. scram-sha-256 is the current standard.
+    query: |
+      SELECT current_setting('password_encryption') AS pwd_enc
+    operator: equals
+    expected: "scram-sha-256"
+    remediation: >
+      In postgresql.conf:
+        password_encryption = scram-sha-256
+      Then reset all existing passwords to re-hash them:
+        ALTER USER <username> WITH PASSWORD '<new_password>';
+    compliance_references:
+      - "CIS PostgreSQL 3.4"
+      - "NIST 800-53 IA-5(1)"
+    tags: [auth, password, hashing, md5]
+
+  - id: PG-CORE-005
+    title: log_connections and log_disconnections are enabled
+    category: Auditing
+    severity: medium
+    mandatory: true
+    database: PostgreSQL
+    description: >
+      Without connection logging, unauthorized access attempts are invisible
+      in the server logs.
+    query: |
+      SELECT
+        current_setting('log_connections') AS log_connections,
+        current_setting('log_disconnections') AS log_disconnections
+    operator: equals
+    expected: "on"
+    valid_values: ["on"]
+    remediation: >
+      In postgresql.conf:
+        log_connections    = on
+        log_disconnections = on
+      Reload: SELECT pg_reload_conf();
+    compliance_references:
+      - "CIS PostgreSQL 3.5"
+      - "NIST 800-53 AU-2"
+    tags: [auditing, logging]
+
+  - id: PG-CORE-006
+    title: Superuser role count is minimal
+    category: Privilege
+    severity: high
+    mandatory: false
+    database: PostgreSQL
+    description: >
+      Each unnecessary superuser account increases blast radius.
+      Only dedicated DBA accounts should hold the SUPERUSER attribute.
+    query: |
+      SELECT COUNT(*) AS superuser_count
+      FROM pg_roles
+      WHERE rolsuper = true
+        AND rolname NOT IN ('postgres')    -- base system superuser
+    operator: less_than
+    expected: 3
+    remediation: >
+      Review and revoke superuser from accounts that don't require it:
+        ALTER ROLE <username> NOSUPERUSER;
+    compliance_references:
+      - "CIS PostgreSQL 4.1"
+      - "NIST 800-53 AC-6"
+    tags: [privilege, superuser, least-privilege]
+
+  - id: PG-CORE-007
+    title: pgaudit extension is installed and configured
+    category: Auditing
+    severity: medium
+    mandatory: false
+    database: PostgreSQL
+    description: >
+      pgaudit provides detailed session and object-level audit logging
+      required for SOC 2, PCI DSS, and HIPAA compliance.
+    query: |
+      SELECT COUNT(*) AS pgaudit_installed
+      FROM pg_available_extensions
+      WHERE name = 'pgaudit' AND installed_version IS NOT NULL
+    operator: equals
+    expected: 1
+    remediation: >
+      Install pgaudit for your PostgreSQL version, then:
+        CREATE EXTENSION pgaudit;
+      In postgresql.conf:
+        shared_preload_libraries = 'pgaudit'
+        pgaudit.log = 'all'
+    compliance_references:
+      - "PCI DSS 10.3"
+      - "SOC 2 CC7.2"
+    tags: [auditing, pgaudit, compliance]
+
+  - id: PG-CORE-008
+    title: listen_addresses is not set to wildcard '*'
+    category: Network
+    severity: medium
+    mandatory: false
+    database: PostgreSQL
+    description: >
+      Listening on all interfaces unnecessarily expands the network attack surface.
+      Bind to specific IP addresses wherever possible.
+    query: |
+      SELECT current_setting('listen_addresses') AS listen_addr
+    operator: not_equals
+    expected: "*"
+    remediation: >
+      In postgresql.conf, specify the exact IP(s) to bind:
+        listen_addresses = '10.0.0.5'
+      Reload: SELECT pg_reload_conf();
+    compliance_references:
+      - "CIS PostgreSQL 2.1"
+      - "NIST 800-53 SC-7"
+    tags: [network, binding, surface-reduction]

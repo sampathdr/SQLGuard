@@ -1,0 +1,77 @@
+﻿# SqlGuard Rule Pack: sqlserver-core / auth
+
+rules:
+
+  - id: MSSQL-CORE-020
+    title: SQL Server uses Windows Authentication mode only
+    category: Authentication
+    severity: high
+    mandatory: false          # advisory — mixed mode required by some apps
+    database: SqlServer
+    description: >
+      Windows Authentication (mode 1) is preferred over Mixed mode (mode 2).
+      SQL logins have weaker brute-force protection than Windows/Kerberos.
+    query: |
+      SELECT CAST(SERVERPROPERTY('IsIntegratedSecurityOnly') AS INT) AS windows_only
+    operator: equals
+    expected: 1
+    remediation: >
+      ALTER LOGIN [sa] DISABLE;
+      Set Authentication mode to Windows only in server properties.
+      Remove all SQL logins not required for application connectivity.
+    compliance_references:
+      - "CIS SQL Server 3.2"
+    tags: [auth, sql-login, windows-auth]
+    notes: "mandatory: false — mixed mode is sometimes unavoidable for legacy apps."
+
+  - id: MSSQL-CORE-021
+    title: Password policy enforcement is enabled on all SQL logins
+    category: Authentication
+    severity: high
+    mandatory: true
+    database: SqlServer
+    description: >
+      SQL logins without password policy enforcement bypass Windows
+      password complexity and expiry settings, enabling weak passwords.
+    query: |
+      SELECT COUNT(*) AS violations
+      FROM sys.sql_logins
+      WHERE is_policy_checked  = 0
+         OR is_expiration_checked = 0
+    operator: equals
+    expected: 0
+    remediation: >
+      For each affected login:
+        ALTER LOGIN [login_name]
+          WITH PASSWORD = N'<new_strong_password>',
+          CHECK_POLICY = ON,
+          CHECK_EXPIRATION = ON;
+    compliance_references:
+      - "CIS SQL Server 3.3"
+      - "NIST 800-53 IA-5"
+    tags: [auth, password-policy, sql-login]
+
+  - id: MSSQL-CORE-022
+    title: No orphaned or disabled logins with server-level permissions
+    category: Authentication
+    severity: medium
+    mandatory: false
+    database: SqlServer
+    description: >
+      Disabled logins that retain sysadmin or server-level permissions
+      are a privilege creep risk if ever re-enabled.
+    query: |
+      SELECT COUNT(*) AS risky_logins
+      FROM sys.server_principals sp
+      JOIN sys.server_permissions perm ON sp.principal_id = perm.grantee_principal_id
+      WHERE sp.is_disabled = 1
+        AND perm.permission_name IN ('CONTROL SERVER','ALTER ANY LOGIN','SYSADMIN')
+    operator: equals
+    expected: 0
+    remediation: >
+      Revoke server permissions from disabled logins, then drop them:
+        REVOKE CONTROL SERVER FROM [login_name];
+        DROP LOGIN [login_name];
+    compliance_references:
+      - "NIST 800-53 AC-2"
+    tags: [auth, privilege, orphaned-accounts]
