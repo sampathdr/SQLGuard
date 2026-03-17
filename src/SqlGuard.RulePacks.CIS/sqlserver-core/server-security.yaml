@@ -1,0 +1,172 @@
+﻿# SqlGuard Rule Pack: sqlserver-core / server-security
+# Format: list of rule definitions
+# See docs/contributing/adding-rules.md for the full schema reference.
+
+rules:
+
+  - id: MSSQL-CORE-001
+    title: SQL Server is running the latest Cumulative Update
+    category: PatchManagement
+    severity: critical
+    mandatory: true
+    database: SqlServer
+    description: >
+      Running an outdated SQL Server build exposes the instance to known CVEs.
+      Always apply the latest Cumulative Update for your major version.
+    query: |
+      SELECT CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(50)) AS version
+    operator: custom
+    dynamic_expected_function: "SqlGuard.Providers.SqlServer.Functions.LatestCuCheck"
+    remediation: >
+      Apply the latest Cumulative Update from
+      https://learn.microsoft.com/sql/database-engine/install-windows/latest-updates-microsoft-sql-server
+    compliance_references:
+      - "CIS SQL Server 1.1"
+      - "NIST 800-53 SI-2"
+      - "DISA STIG SQL2022-00-000020"
+    tags: [patch, cve, critical]
+    notes: >
+      The dynamic_expected_function resolves the minimum build number for the
+      detected major version at scan time from a built-in version table.
+
+  - id: MSSQL-CORE-002
+    title: SA account is disabled or renamed
+    category: Authentication
+    severity: high
+    mandatory: true
+    database: SqlServer
+    description: >
+      The 'sa' login is a well-known target for brute-force attacks.
+      It must be disabled or renamed to reduce attack surface.
+    query: |
+      SELECT
+        name,
+        CAST(is_disabled AS INT) AS is_disabled
+      FROM sys.server_principals
+      WHERE sid = 0x01 AND type = 'S'
+    operator: equals
+    expected: "1"                   # is_disabled = 1 (true)
+    remediation: >
+      ALTER LOGIN [sa] DISABLE;
+      -- Or rename: ALTER LOGIN [sa] WITH NAME = [sq_admin_acct];
+    compliance_references:
+      - "CIS SQL Server 3.1"
+      - "DISA STIG SQL2022-00-000010"
+    tags: [auth, privilege, sa]
+
+  - id: MSSQL-CORE-003
+    title: xp_cmdshell is disabled
+    category: SurfaceReduction
+    severity: critical
+    mandatory: true
+    database: SqlServer
+    description: >
+      xp_cmdshell allows execution of operating system commands directly from T-SQL.
+      This is one of the most dangerous SQL Server features and must be disabled.
+    query: |
+      SELECT value_in_use
+      FROM sys.configurations
+      WHERE name = 'xp_cmdshell'
+    operator: equals
+    expected: 0
+    remediation: >
+      EXEC sp_configure 'xp_cmdshell', 0;
+      RECONFIGURE;
+    compliance_references:
+      - "CIS SQL Server 2.1"
+      - "NIST 800-53 CM-7"
+    tags: [rce, surface-reduction, critical]
+
+  - id: MSSQL-CORE-004
+    title: OLE Automation Procedures are disabled
+    category: SurfaceReduction
+    severity: high
+    mandatory: true
+    database: SqlServer
+    description: >
+      OLE Automation Procedures allow COM object creation from T-SQL,
+      enabling privilege escalation and lateral movement.
+    query: |
+      SELECT value_in_use
+      FROM sys.configurations
+      WHERE name = 'Ole Automation Procedures'
+    operator: equals
+    expected: 0
+    remediation: >
+      EXEC sp_configure 'Ole Automation Procedures', 0;
+      RECONFIGURE;
+    compliance_references:
+      - "CIS SQL Server 2.7"
+    tags: [surface-reduction, com, privilege-escalation]
+
+  - id: MSSQL-CORE-005
+    title: Ad-Hoc Distributed Queries are disabled
+    category: SurfaceReduction
+    severity: medium
+    mandatory: true
+    database: SqlServer
+    description: >
+      OPENROWSET and OPENDATASOURCE can be used to exfiltrate data to
+      external sources or access internal network resources.
+    query: |
+      SELECT value_in_use
+      FROM sys.configurations
+      WHERE name = 'Ad Hoc Distributed Queries'
+    operator: equals
+    expected: 0
+    remediation: >
+      EXEC sp_configure 'Ad Hoc Distributed Queries', 0;
+      RECONFIGURE;
+    compliance_references:
+      - "CIS SQL Server 2.2"
+    tags: [exfiltration, surface-reduction]
+
+  - id: MSSQL-CORE-006
+    title: Login auditing captures both successful and failed logins
+    category: Auditing
+    severity: medium
+    mandatory: true
+    database: SqlServer
+    description: >
+      Login auditing level 3 records both successful and failed logins.
+      Without this, brute-force attacks and unauthorized access may go undetected.
+    query: |
+      SELECT CAST(SERVERPROPERTY('AuditLevel') AS INT) AS audit_level
+    operator: equals
+    expected: 3
+    remediation: >
+      In SSMS: right-click server → Properties → Security
+      → Login Auditing → select "Both failed and successful logins".
+      Restart SQL Server service to apply.
+    compliance_references:
+      - "CIS SQL Server 4.2"
+      - "NIST 800-53 AU-2"
+      - "PCI DSS 10.2"
+    tags: [auditing, logging, compliance]
+
+  - id: MSSQL-CORE-007
+    title: CLR integration is disabled or explicitly approved
+    category: SurfaceReduction
+    severity: medium
+    mandatory: false          # advisory — many apps require CLR
+    database: SqlServer
+    description: >
+      CLR integration allows arbitrary .NET assemblies in the database engine.
+      Disable it if no business-approved CLR assemblies are deployed.
+    query: |
+      SELECT value_in_use
+      FROM sys.configurations
+      WHERE name = 'clr enabled'
+    operator: equals
+    expected: 0
+    remediation: >
+      EXEC sp_configure 'clr enabled', 0;
+      RECONFIGURE;
+      If CLR is required, ensure only SAFE assemblies are loaded and
+      document the business justification.
+    compliance_references:
+      - "CIS SQL Server 2.4"
+    tags: [surface-reduction, clr]
+    notes: >
+      mandatory: false — this check raises a WARN, not a FAIL.
+      Override to mandatory: true in your site policy if CLR is prohibited.

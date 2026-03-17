@@ -1,0 +1,58 @@
+{
+  "_comment": "SqlGuard inventory file — safe to commit. No literal passwords.",
+  "_docs": "https://github.com/your-org/sqlguard/docs/inventory.md",
+
+  "default_packs": [
+    "sqlserver-core",
+    "sqlserver-cis"
+  ],
+
+  "servers": [
+    {
+      "label": "prod-db-1",
+      "engine": "SqlServer",
+      "host": "10.0.1.10",
+      "port": 1433,
+      "database": "AppDb",
+      "auth": {
+        "type": "password",
+        "username": "sqlguard_scanner",
+        "password_env": "PROD_DB_PASS"
+      }
+    },
+    {
+      "label": "prod-db-2",
+      "engine": "SqlServer",
+      "host": "10.0.1.11",
+      "port": 1433,
+      "database": "AppDb",
+      "auth": {
+        "type": "password",
+        "username": "sqlguard_scanner",
+        "password_env": "PROD_DB_PASS"
+      }
+    },
+    {
+      "label": "postgres-analytics",
+      "engine": "PostgreSQL",
+      "host": "10.0.2.20",
+      "port": 5432,
+      "database": "analytics",
+      "packs": [ "postgresql-core", "postgresql-cis" ],
+      "auth": {
+        "type": "password",
+        "username": "sqlguard_scanner",
+        "password_env": "PG_ANALYTICS_PASS"
+      }
+    },
+    {
+      "label": "azure-sql-prod",
+      "engine": "SqlServer",
+      "host": "myapp.database.windows.net",
+      "database": "AppDb",
+      "auth": {
+        "type": "managed_identity"
+      }
+    }
+  ]
+}

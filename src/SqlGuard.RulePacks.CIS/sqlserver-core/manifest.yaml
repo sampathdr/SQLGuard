@@ -1,0 +1,12 @@
+﻿id: sqlserver-core
+name: SQL Server Core Security Rules
+description: >
+  Mandatory security baseline for all SQL Server instances.
+  These rules represent the minimum acceptable security posture
+  and should never be disabled in production environments.
+version: 1.0.0
+engine: SqlServer
+author: SqlGuard Contributors
+homepage: https://github.com/your-org/sqlguard
+tags: [sqlserver, core, mandatory, baseline]
+dependencies: []
