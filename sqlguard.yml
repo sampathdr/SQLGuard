@@ -1,0 +1,84 @@
+# SqlGuard Configuration File
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY:  This file is safe to commit to version control.
+#            Never store literal passwords here.
+#            Use password_env: VARNAME  (the env var NAME, not its value).
+# ─────────────────────────────────────────────────────────────────────────────
+schema_version: "1"
+
+# ── Default server ────────────────────────────────────────────────────────────
+# Used when no --profile is specified.
+server:
+  label: "Production SQL Server"
+  engine: SqlServer           # SqlServer | PostgreSQL | MySQL | Oracle
+  host: prod-db.internal
+  port: 0                     # 0 = use engine default (1433 for SQL Server, 5432 for PG)
+  database: AppDatabase
+  timeout_seconds: 30
+  auth:
+    type: password            # password | integrated | managed_identity | connection_string
+    username: sqlguard_scanner
+    password_env: SQLGUARD_DB_PASS  # export SQLGUARD_DB_PASS=<your_password>
+
+# ── Named profiles ────────────────────────────────────────────────────────────
+# Select with:  sqlguard scan --config sqlguard.yml --profile staging
+profiles:
+
+  staging:
+    label: "Staging"
+    engine: SqlServer
+    host: staging-db.internal
+    database: AppDatabase
+    auth:
+      type: password
+      username: sqlguard_scanner
+      password_env: STAGING_DB_PASS
+
+  postgres-prod:
+    label: "Production PostgreSQL"
+    engine: PostgreSQL
+    host: pg-prod.internal
+    port: 5432
+    database: app_db
+    auth:
+      type: password
+      username: sqlguard_scanner
+      password_env: PG_PROD_DB_PASS
+
+  azure-sql:
+    label: "Azure SQL"
+    engine: SqlServer
+    host: myserver.database.windows.net
+    database: mydb
+    auth:
+      type: managed_identity  # Uses Azure Managed Identity — no password needed
+
+  windows-auth:
+    label: "On-prem SQL (Windows auth)"
+    engine: SqlServer
+    host: on-prem-sql.corp.local
+    database: FinanceDb
+    auth:
+      type: integrated        # Windows Kerberos / NTLM — no username/password
+
+# ── Scan defaults ─────────────────────────────────────────────────────────────
+scan:
+  packs:
+    - sqlserver-core
+    - sqlserver-cis
+  fail_on: mandatory          # mandatory | critical | high | medium | low
+  min_severity: Low
+  mandatory_only: false
+  exclude_rules:              # Rule IDs to skip (document the business reason)
+    []
+  max_concurrency: 4
+
+# ── Report output ─────────────────────────────────────────────────────────────
+report:
+  formats:
+    - console                 # Human output — always shown in terminal
+    - json                    # Machine-readable — CI/CD, dashboards
+    - html                    # Visual report for DBAs and auditors
+  output_directory: ./reports
+  file_base_name: sqlguard-report
+  per_server_files: true      # inventory scans: one file per server

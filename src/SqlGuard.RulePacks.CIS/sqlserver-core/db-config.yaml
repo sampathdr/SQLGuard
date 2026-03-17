@@ -1,0 +1,60 @@
+﻿# SqlGuard Rule Pack: sqlserver-core / encryption
+
+rules:
+
+  - id: MSSQL-CORE-010
+    title: Transparent Data Encryption (TDE) is enabled on user databases
+    category: Encryption
+    severity: high
+    mandatory: true
+    database: SqlServer
+    description: >
+      TDE encrypts database files and backups at rest, preventing
+      physical media theft from exposing sensitive data.
+    query: |
+      SELECT STRING_AGG(name, ', ') AS unencrypted_databases
+      FROM sys.databases
+      WHERE is_encrypted = 0
+        AND name NOT IN ('master', 'tempdb', 'model', 'msdb')
+    operator: equals
+    expected: null               # null result means all databases are encrypted
+    remediation: >
+      For each unencrypted database:
+        USE [YourDatabase];
+        CREATE DATABASE ENCRYPTION KEY WITH ALGORITHM = AES_256
+          ENCRYPTION BY SERVER CERTIFICATE YourTDECert;
+        ALTER DATABASE [YourDatabase] SET ENCRYPTION ON;
+    compliance_references:
+      - "CIS SQL Server 5.1"
+      - "NIST 800-53 SC-28"
+      - "PCI DSS 3.4.1"
+      - "HIPAA §164.312(a)(2)(iv)"
+    tags: [encryption, tde, at-rest, compliance]
+
+  - id: MSSQL-CORE-011
+    title: Server-level connections use encrypted transport (Force Encryption)
+    category: Encryption
+    severity: high
+    mandatory: true
+    database: SqlServer
+    description: >
+      When Force Encryption is enabled, all client connections must
+      use TLS, preventing cleartext credential and data interception.
+    query: |
+      SELECT value_data
+      FROM sys.dm_server_registry
+      WHERE registry_key LIKE '%SuperSocketNetLib%'
+        AND value_name = 'Certificate'
+    operator: custom
+    dynamic_expected_function: "SqlGuard.Providers.SqlServer.Functions.ForceEncryptionCheck"
+    remediation: >
+      In SQL Server Configuration Manager:
+      SQL Server Network Configuration → Protocols for MSSQLSERVER
+      → Properties → Certificate tab: select a valid certificate.
+      → Flags tab: Force Encryption = Yes.
+      Restart the SQL Server service.
+    compliance_references:
+      - "CIS SQL Server 3.13"
+      - "NIST 800-53 SC-8"
+      - "PCI DSS 4.2.1"
+    tags: [encryption, tls, in-transit]
